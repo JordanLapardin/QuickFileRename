@@ -14,6 +14,8 @@ namespace QuickFileRename
     public partial class Form1 : Form
     {
         private List<FileInfo> files = new List<FileInfo>();
+        private string selectedFolderName = string.Empty;
+        private List<string> allowedExtensions = new List<string>();
 
         public Form1()
         {
@@ -27,11 +29,21 @@ namespace QuickFileRename
             this.StartPosition = FormStartPosition.CenterScreen;
             txtPattern.Text = "[FileName] Episode {0}";
 
+            // Initialize default allowed extensions (video files only)
+            InitializeDefaultFileTypes();
+
             // Enable drag and drop for the ListView
             lvFiles.AllowDrop = true;
             lvFiles.DragOver += LvFiles_DragOver;
             lvFiles.DragDrop += LvFiles_DragDrop;
             lvFiles.MouseDown += LvFiles_MouseDown;
+        }
+
+        private void InitializeDefaultFileTypes()
+        {
+            // Set default to video files only
+            allowedExtensions.Clear();
+            allowedExtensions.AddRange(new[] { ".mp4", ".mkv", ".avi", ".mov", ".flv", ".wmv", ".webm", ".m4v", ".3gp", ".ogv", ".ts", ".mpg", ".mpeg", ".m2ts", ".mts" });
         }
 
         private void LvFiles_MouseDown(object sender, MouseEventArgs e)
@@ -80,6 +92,7 @@ namespace QuickFileRename
             if (folderBrowser.ShowDialog() == DialogResult.OK)
             {
                 txtFolderPath.Text = folderBrowser.SelectedPath;
+                selectedFolderName = new DirectoryInfo(folderBrowser.SelectedPath).Name;
                 LoadFiles();
             }
         }
@@ -91,15 +104,31 @@ namespace QuickFileRename
 
             if (string.IsNullOrWhiteSpace(txtFolderPath.Text))
             {
+                lblStatus.Text = "Please enter or select a folder path.";
                 return;
             }
 
             try
             {
-                DirectoryInfo dir = new DirectoryInfo(txtFolderPath.Text);
+                string folderPath = txtFolderPath.Text.Trim();
+
+                // Check if the path exists
+                if (!Directory.Exists(folderPath))
+                {
+                    lblStatus.Text = "Folder path does not exist.";
+                    MessageBox.Show($"The folder path does not exist:\n{folderPath}", "Invalid Path", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                DirectoryInfo dir = new DirectoryInfo(folderPath);
+                selectedFolderName = dir.Name;
                 FileInfo[] fileArray = dir.GetFiles();
 
-                files = fileArray.OrderBy(f => f.Name).ToList();
+                // Filter files based on allowed extensions
+                files = fileArray
+                    .Where(f => allowedExtensions.Contains(f.Extension.ToLower()))
+                    .OrderBy(f => f.Name)
+                    .ToList();
 
                 UpdatePreview();
                 lblStatus.Text = $"Loaded {files.Count} files.";
@@ -107,6 +136,7 @@ namespace QuickFileRename
             catch (Exception ex)
             {
                 MessageBox.Show($"Error loading files: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                lblStatus.Text = "Error loading files.";
             }
         }
 
@@ -128,12 +158,11 @@ namespace QuickFileRename
                 {
                     FileInfo file = files[i];
                     string extension = file.Extension;
-                    string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(file.Name);
 
-                    // Build new name by replacing both [FileName] and {0}
+                    // Build new name by replacing [FileName] with folder name and {0} with episode number
                     int episodeNumber = startNumber + i;
                     string newBaseName = pattern
-                        .Replace("[FileName]", fileNameWithoutExtension)
+                        .Replace("[FileName]", selectedFolderName)
                         .Replace("{0}", episodeNumber.ToString());
                     string newName = newBaseName + extension;
 
@@ -184,7 +213,12 @@ namespace QuickFileRename
                 return;
             }
 
-            try
+            // Create and show progress form
+            ProgressForm progressForm = new ProgressForm();
+
+            // Perform rename in background thread
+            BackgroundWorker renameWorker = new BackgroundWorker();
+            renameWorker.DoWork += (sender1, e1) =>
             {
                 string pattern = txtPattern.Text;
                 int startNumber = (int)numStartNumber.Value;
@@ -195,18 +229,23 @@ namespace QuickFileRename
                 {
                     FileInfo file = files[i];
                     string extension = file.Extension;
-                    string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(file.Name);
 
-                    // Build new name by replacing both [FileName] and {0}
+                    // Build new name by replacing [FileName] with folder name and {0} with episode number
                     int episodeNumber = startNumber + i;
                     string newBaseName = pattern
-                        .Replace("[FileName]", fileNameWithoutExtension)
+                        .Replace("[FileName]", selectedFolderName)
                         .Replace("{0}", episodeNumber.ToString());
                     string newName = newBaseName + extension;
                     string newPath = Path.Combine(file.DirectoryName, newName);
 
                     try
                     {
+                        // Update progress
+                        progressForm.Invoke(new Action(() =>
+                        {
+                            progressForm.UpdateProgress(i + 1, files.Count, file.Name);
+                        }));
+
                         // Check if new name already exists
                         if (File.Exists(newPath) && !newPath.Equals(file.FullName, StringComparison.OrdinalIgnoreCase))
                         {
@@ -222,21 +261,46 @@ namespace QuickFileRename
                     }
                 }
 
+                e1.Result = new { successCount, errorCount };
+            };
+
+            renameWorker.RunWorkerCompleted += (sender1, e1) =>
+            {
+                progressForm.SetComplete();
+                System.Threading.Thread.Sleep(500); // Brief pause to show completion
+
+                dynamic renameResult = e1.Result;
+                int successCount = renameResult.successCount;
+                int errorCount = renameResult.errorCount;
+
+                progressForm.Close();
+
                 string message = $"Rename operation completed.\nSuccessfully renamed: {successCount}\nFailed: {errorCount}";
                 MessageBox.Show(message, "Rename Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                 LoadFiles();
                 lblStatus.Text = $"Renamed {successCount} file(s).";
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error during rename: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            };
+
+            progressForm.Show();
+            renameWorker.RunWorkerAsync();
         }
 
         private void btnCancel_Click(object sender, EventArgs e)
         {
             this.Close();
+        }
+
+        private void btnOptions_Click(object sender, EventArgs e)
+        {
+            OptionsForm optionsForm = new OptionsForm();
+            optionsForm.SelectedExtensions = new List<string>(allowedExtensions);
+
+            if (optionsForm.ShowDialog(this) == DialogResult.OK)
+            {
+                allowedExtensions = optionsForm.SelectedExtensions;
+                LoadFiles();
+            }
         }
     }
 }

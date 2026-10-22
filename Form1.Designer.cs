@@ -42,6 +42,7 @@
             this.btnRefresh = new System.Windows.Forms.Button();
             this.btnRename = new System.Windows.Forms.Button();
             this.btnCancel = new System.Windows.Forms.Button();
+            this.btnOptions = new System.Windows.Forms.Button();
             this.lblStatus = new System.Windows.Forms.Label();
             this.folderBrowser = new System.Windows.Forms.FolderBrowserDialog();
             ((System.ComponentModel.ISupportInitialize)(this.numStartNumber)).BeginInit();
@@ -60,7 +61,7 @@
             // 
             this.txtFolderPath.Location = new System.Drawing.Point(60, 12);
             this.txtFolderPath.Name = "txtFolderPath";
-            this.txtFolderPath.ReadOnly = true;
+            this.txtFolderPath.ReadOnly = false;
             this.txtFolderPath.Size = new System.Drawing.Size(650, 20);
             this.txtFolderPath.TabIndex = 1;
             // 
@@ -177,13 +178,23 @@
             this.btnCancel.UseVisualStyleBackColor = true;
             this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
             // 
+            // btnOptions
+            // 
+            this.btnOptions.Location = new System.Drawing.Point(628, 39);
+            this.btnOptions.Name = "btnOptions";
+            this.btnOptions.Size = new System.Drawing.Size(70, 23);
+            this.btnOptions.TabIndex = 12;
+            this.btnOptions.Text = "Options";
+            this.btnOptions.UseVisualStyleBackColor = true;
+            this.btnOptions.Click += new System.EventHandler(this.btnOptions_Click);
+            // 
             // lblStatus
             // 
             this.lblStatus.AutoSize = true;
             this.lblStatus.Location = new System.Drawing.Point(12, 394);
             this.lblStatus.Name = "lblStatus";
             this.lblStatus.Size = new System.Drawing.Size(38, 13);
-            this.lblStatus.TabIndex = 12;
+            this.lblStatus.TabIndex = 13;
             this.lblStatus.Text = "Ready.";
             // 
             // Form1
@@ -194,6 +205,7 @@
             this.Controls.Add(this.lblStatus);
             this.Controls.Add(this.btnCancel);
             this.Controls.Add(this.btnRename);
+            this.Controls.Add(this.btnOptions);
             this.Controls.Add(this.btnRefresh);
             this.Controls.Add(this.lvFiles);
             this.Controls.Add(this.lblPreview);
@@ -229,6 +241,7 @@
         private System.Windows.Forms.Button btnRefresh;
         private System.Windows.Forms.Button btnRename;
         private System.Windows.Forms.Button btnCancel;
+        private System.Windows.Forms.Button btnOptions;
         private System.Windows.Forms.Label lblStatus;
         private System.Windows.Forms.FolderBrowserDialog folderBrowser;
     }
